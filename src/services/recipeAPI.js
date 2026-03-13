@@ -60,8 +60,11 @@ export const enrichMeals = async (meals) => {
 }
 
 export const getIndianRecipes = async (diet = "all") => {
-  // Pick random searches for variety
-  const shuffled = INDIAN_SEARCHES.sort(() => Math.random() - 0.5).slice(0, 6)
+  // Shuffle searches for variety every load
+  const shuffled = [...INDIAN_SEARCHES]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 4)
+
   const results = await Promise.all(
     shuffled.map((q) =>
       axios.get(`${MEALDB}/search.php?s=${q}`)
@@ -69,15 +72,25 @@ export const getIndianRecipes = async (diet = "all") => {
         .catch(() => [])
     )
   )
+
   const combined = results.flat()
   const unique = combined.filter(
     (m, i, self) => self.findIndex((x) => x.idMeal === m.idMeal) === i
   )
-  return unique.filter((m) => isMealAllowed(m, diet))
+
+  const filtered = unique.filter((m) => isMealAllowed(m, diet))
+
+  // Shuffle and return only 6 random recipes
+  return filtered
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 6)
 }
 
 export const getSeafoodRecipes = async () => {
-  const shuffled = SEAFOOD_SEARCHES.sort(() => Math.random() - 0.5).slice(0, 4)
+  const shuffled = [...SEAFOOD_SEARCHES]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3)
+
   const results = await Promise.all(
     shuffled.map((q) =>
       axios.get(`${MEALDB}/search.php?s=${q}`)
@@ -85,10 +98,15 @@ export const getSeafoodRecipes = async () => {
         .catch(() => [])
     )
   )
+
   const combined = results.flat()
-  return combined.filter(
+  const unique = combined.filter(
     (m, i, self) => self.findIndex((x) => x.idMeal === m.idMeal) === i
   )
+
+  return unique
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 6)
 }
 
 export const searchRecipes = async (query, diet = "all") => {

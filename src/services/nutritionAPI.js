@@ -1,47 +1,65 @@
-import axios from "axios";
+import axios from "axios"
 
-// Open Food Facts API — free, unlimited, no key needed
-const OFF_URL = "https://world.openfoodfacts.org/cgi/search.pl";
+const USDA_URL = "https://api.nal.usda.gov/fdc/v1"
+const KEY = import.meta.env.VITE_USDA_KEY
 
-export const getNutrition = async (ingredientName) => {
+const nutritionCache = {}
+
+const getNutritionForIngredient = async (ingredientName) => {
+  const name = ingredientName.toLowerCase().trim()
+  if (nutritionCache[name]) return nutritionCache[name]
+
   try {
-    const res = await axios.get(OFF_URL, {
+    const res = await axios.get(`${USDA_URL}/foods/search`, {
       params: {
-        search_terms: ingredientName,
-        search_simple: 1,
-        action: "process",
-        json: 1,
-        page_size: 1,
-      },
+        api_key: KEY,
+        query: name,
+        pageSize: 1,
+        dataType: "SR Legacy,Foundation"
+      }
     })
-    const product = res.data.products?.[0]
-    if (!product?.nutriments) return null
 
-    return {
-      calories: Math.round(product.nutriments["energy-kcal_100g"] || 0),
-      protein: Math.round(product.nutriments["proteins_100g"] || 0),
-      carbs: Math.round(product.nutriments["carbohydrates_100g"] || 0),
-      fat: Math.round(product.nutriments["fat_100g"] || 0),
+    const food = res.data.foods?.[0]
+    if (!food) return null
+
+    const nutrients = food.foodNutrients || []
+
+    const get = (name) => {
+      const n = nutrients.find((n) => n.nutrientName?.toLowerCase().includes(name))
+      return Math.round(n?.value || 0)
     }
+
+    const result = {
+      calories: get("energy"),
+      protein: get("protein"),
+      carbs: get("carbohydrate"),
+      fat: get("total lipid"),
+    }
+
+    nutritionCache[name] = result
+    return result
   } catch {
     return null
   }
 }
 
-// Calculate nutrition for a full recipe
 export const getRecipeNutrition = async (ingredients) => {
+  if (!ingredients || ingredients.length === 0) return null
+
   const results = await Promise.all(
-    ingredients.slice(0, 5).map((ing) => getNutrition(ing.name))
+    ingredients.slice(0, 8).map((ing) =>
+      getNutritionForIngredient(ing.name)
+    )
   )
 
   const total = results.reduce(
     (acc, n) => {
       if (!n) return acc
       return {
-        calories: acc.calories + n.calories,
-        protein: acc.protein + n.protein,
-        carbs: acc.carbs + n.carbs,
-        fat: acc.fat + n.fat,
+        calories: acc.calories + Math.round(n.calories * 0.15),
+        protein: acc.protein + Math.round(n.protein * 0.15),
+        carbs: acc.carbs + Math.round(n.carbs * 0.15),
+        fat: acc.fat + Math.round(n.fat * 0.15),
       }
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -50,19 +68,18 @@ export const getRecipeNutrition = async (ingredients) => {
   return total
 }
 
-// Determine fitness goal tag based on nutrition
 export const getFitnessTag = (nutrition) => {
   if (!nutrition) return null
   const { protein, calories, fat } = nutrition
 
-  if (protein >= 20 && calories <= 500) {
-    return { label: "💪 Muscle Gain", color: "#4caf50", bg: "#1b3a1b" }
+  if (protein >= 15 && calories <= 500) {
+    return { label: "💪 Muscle Gain", color: "#4caf50", bg: "#1b3a1b", value: "muscle" }
   }
-  if (calories <= 350 && fat <= 10) {
-    return { label: "🔥 Fat Loss", color: "#ff9800", bg: "#3a2a0a" }
+  if (calories <= 300 && fat <= 8) {
+    return { label: "🔥 Fat Loss", color: "#ff9800", bg: "#3a2a0a", value: "fatloss" }
   }
-  if (protein >= 10 && calories <= 600) {
-    return { label: "⚖️ Balanced", color: "#2196f3", bg: "#0a2a3a" }
+  if (protein >= 8 && calories <= 500) {
+    return { label: "⚖️ Balanced", color: "#2196f3", bg: "#0a2a3a", value: "balanced" }
   }
-  return { label: "🍽️ Comfort Food", color: "#9c27b0", bg: "#2a0a3a" }
+  return { label: "🍽️ Comfort Food", color: "#9c27b0", bg: "#2a0a3a", value: "comfort" }
 }

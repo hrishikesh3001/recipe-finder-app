@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { searchYoutubeVideo } from "../services/youtubeAPI"
 import SearchBar from "../components/SearchBar"
 import IngredientFilter from "../components/IngredientFilter"
 import RecipeCard from "../components/RecipeCard"
@@ -36,6 +37,8 @@ function Home() {
   const [servings, setServings] = useState(2)
   const [fitnessFilter, setFitnessFilter] = useState("all")
   const [timeFilter, setTimeFilter] = useState("all")
+  const [youtubeResults, setYoutubeResults] = useState([])
+  const [ytLoading, setYtLoading] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,6 +48,7 @@ function Home() {
   const loadDefault = async (cuisineType) => {
     setLoading(true)
     setError("")
+    setYoutubeResults([])
     let results = []
     if (cuisineType === "seafood") {
       results = await getSeafoodRecipes()
@@ -59,12 +63,21 @@ function Home() {
     setLoading(true)
     setError("")
     setMode("search")
+    setYoutubeResults([])
     const results = await searchRecipes(query, diet)
     if (results && results.length > 0) {
       setRecipes(results)
     } else {
       setRecipes([])
-      setError("No recipes found. Try something else!")
+      setError(`No recipes found in our app for "${query}"`)
+      setYtLoading(true)
+      const videos = await Promise.all([
+        searchYoutubeVideo(`${query} indian recipe`),
+        searchYoutubeVideo(`${query} recipe easy`),
+        searchYoutubeVideo(`${query} recipe homemade`),
+      ])
+      setYoutubeResults(videos.filter(Boolean))
+      setYtLoading(false)
     }
     setLoading(false)
   }
@@ -79,12 +92,22 @@ function Home() {
     setLoading(true)
     setError("")
     setMode("ingredients")
+    setYoutubeResults([])
     const results = await searchByIngredients(ingredients, diet)
     if (results && results.length > 0) {
       setRecipes(results)
     } else {
       setRecipes([])
       setError("No recipes found with those ingredients!")
+      setYtLoading(true)
+      const query = ingredients.join(" ")
+      const videos = await Promise.all([
+        searchYoutubeVideo(`${query} indian recipe`),
+        searchYoutubeVideo(`${query} recipe easy`),
+        searchYoutubeVideo(`${query} homemade recipe`),
+      ])
+      setYoutubeResults(videos.filter(Boolean))
+      setYtLoading(false)
     }
     setLoading(false)
   }
@@ -110,12 +133,41 @@ function Home() {
     return "🇮🇳 Popular Indian Recipes"
   }
 
+  const filteredRecipes = recipes.filter((recipe) => {
+    if (diet === "vegetarian") {
+      const ingredients = []
+      for (let i = 1; i <= 20; i++) {
+        const ing = recipe[`strIngredient${i}`]?.toLowerCase() || ""
+        if (ing) ingredients.push(ing)
+      }
+      const hasNonVeg = ingredients.some((i) =>
+        ["chicken", "fish", "prawn", "shrimp", "crab", "egg"].some(n => i.includes(n))
+      )
+      if (hasNonVeg) return false
+    }
+    if (diet === "chicken") {
+      const ingredients = []
+      for (let i = 1; i <= 20; i++) {
+        const ing = recipe[`strIngredient${i}`]?.toLowerCase() || ""
+        if (ing) ingredients.push(ing)
+      }
+      return ingredients.some((i) => i.includes("chicken") || i.includes("egg"))
+    }
+    if (diet === "seafood") {
+      const ingredients = []
+      for (let i = 1; i <= 20; i++) {
+        const ing = recipe[`strIngredient${i}`]?.toLowerCase() || ""
+        if (ing) ingredients.push(ing)
+      }
+      return ingredients.some((i) =>
+        ["fish", "prawn", "shrimp", "crab", "salmon", "tuna"].some(n => i.includes(n))
+      )
+    }
+    return true
+  })
+
   return (
-    <div style={{
-      display: "flex",
-      minHeight: "100vh",
-      background: "#0f0f0f"
-    }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#0f0f0f" }}>
 
       {/* Sidebar Toggle Button */}
       <button
@@ -157,12 +209,10 @@ function Home() {
       <div style={{
         flex: 1,
         padding: "32px",
-        marginLeft: sidebarOpen ? "0px" : "0px",
         transition: "margin 0.3s ease",
         overflowX: "hidden"
       }}>
 
-        {/* Search Bar */}
         <div style={{ marginTop: "20px" }}>
           <SearchBar onSearch={handleSearch} />
         </div>
@@ -179,8 +229,6 @@ function Home() {
           borderRadius: "12px",
           border: "1px solid #2a2a2a"
         }}>
-
-          {/* Fitness Goal Filter */}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {FITNESS_FILTERS.map((f) => (
               <button
@@ -203,10 +251,8 @@ function Home() {
             ))}
           </div>
 
-          {/* Divider */}
           <div style={{ width: "1px", height: "30px", background: "#333" }} />
 
-          {/* Time Filter */}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {TIME_FILTERS.map((t) => (
               <button
@@ -229,23 +275,17 @@ function Home() {
             ))}
           </div>
 
-          {/* Divider */}
           <div style={{ width: "1px", height: "30px", background: "#333" }} />
 
-          {/* Servings Selector */}
           <ServingsSelector onChange={setServings} />
         </div>
 
         {/* Section Title */}
-        <h2 style={{
-          marginBottom: "20px",
-          fontSize: "18px",
-          color: "#aaa"
-        }}>
+        <h2 style={{ marginBottom: "20px", fontSize: "18px", color: "#aaa" }}>
           {getSectionTitle()}
-          {recipes.length > 0 && (
+          {filteredRecipes.length > 0 && (
             <span style={{ fontSize: "14px", color: "#555", marginLeft: "10px" }}>
-              {recipes.length} recipes
+              {filteredRecipes.length} recipes
             </span>
           )}
         </h2>
@@ -260,19 +300,83 @@ function Home() {
           <p style={{ color: "#f44336", fontSize: "15px" }}>{error}</p>
         )}
 
-        {!loading && recipes.length === 0 && !error && (
+        {/* YouTube Fallback */}
+        {ytLoading && (
+          <p style={{ color: "#ff9800", marginTop: "16px" }}>
+            🔍 Searching YouTube for videos...
+          </p>
+        )}
+
+        {youtubeResults.length > 0 && (
+          <div style={{ marginTop: "20px" }}>
+            <h2 style={{ color: "#ff9800", marginBottom: "16px", fontSize: "18px" }}>
+              📺 Watch on YouTube instead:
+            </h2>
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              {youtubeResults.map((video) => (
+                  <a
+                  key={video.videoId}
+                  href={video.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    textDecoration: "none",
+                    width: "280px",
+                    background: "#1e1e1e",
+                    border: "1px solid #2a2a2a",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    transition: "border-color 0.2s",
+                    display: "block"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "#ff0000"}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "#2a2a2a"}
+                >
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    style={{ width: "100%", height: "157px", objectFit: "cover" }}
+                  />
+                  <div style={{ padding: "12px" }}>
+                    <p style={{
+                      color: "#f0f0f0",
+                      fontSize: "13px",
+                      lineHeight: "1.4",
+                      marginBottom: "6px"
+                    }}>
+                      {video.title}
+                    </p>
+                    <p style={{ color: "#aaa", fontSize: "12px" }}>
+                      📺 {video.channel}
+                    </p>
+                    <div style={{
+                      marginTop: "10px",
+                      display: "inline-block",
+                      background: "#ff0000",
+                      color: "#fff",
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold"
+                    }}>
+                      Watch on YouTube ▶️
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && filteredRecipes.length === 0 && !error && (
           <p style={{ color: "#555", fontSize: "15px" }}>
             No recipes found. Try different filters! 🥕
           </p>
         )}
 
         {/* Recipe Grid */}
-        <div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "20px"
-        }}>
-          {recipes.map((recipe) => (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}>
+          {filteredRecipes.map((recipe) => (
             <RecipeCard
               key={recipe.idMeal || recipe.id}
               recipe={recipe}
