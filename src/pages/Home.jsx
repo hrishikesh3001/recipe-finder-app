@@ -15,22 +15,27 @@ function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [cuisine, setCuisine] = useState("all")
-  const [dietMode, setDietMode] = useState("all") // all, vegetarian, chicken
+  const [diet, setDiet] = useState("all")
+  const [userIngredients, setUserIngredients] = useState([])
+  const [mode, setMode] = useState("popular")
   const navigate = useNavigate()
 
   useEffect(() => {
-    const loadDefault = async () => {
-      setLoading(true)
-      const results = await getPopularRecipes()
-      setRecipes(results || [])
-      setLoading(false)
-    }
-    loadDefault()
+    loadPopular()
   }, [])
+
+  const loadPopular = async () => {
+    setLoading(true)
+    setError("")
+    const results = await getPopularRecipes()
+    setRecipes(results || [])
+    setLoading(false)
+  }
 
   const handleSearch = async (query) => {
     setLoading(true)
     setError("")
+    setMode("search")
     const results = await searchRecipes(query, cuisine === "indian" ? "indian" : "")
     if (results && results.length > 0) {
       setRecipes(results)
@@ -41,9 +46,16 @@ function Home() {
     setLoading(false)
   }
 
-  const handleFilter = async (ingredients) => {
+  const handleIngredients = async (ingredients) => {
+    setUserIngredients(ingredients)
+    if (ingredients.length === 0) {
+      setMode("popular")
+      loadPopular()
+      return
+    }
     setLoading(true)
     setError("")
+    setMode("ingredients")
     const results = await searchByIngredients(ingredients)
     if (results && results.length > 0) {
       setRecipes(results)
@@ -54,18 +66,22 @@ function Home() {
     setLoading(false)
   }
 
-  const handleCuisine = async (type) => {
-    setCuisine(type)
+  const handleCuisineChange = async (value) => {
+    setCuisine(value)
     setLoading(true)
     setError("")
-    if (type === "indian") {
+    if (value === "indian") {
       const results = await getIndianRecipes()
       setRecipes(results || [])
     } else {
-      const results = await getPopularRecipes()
-      setRecipes(results || [])
+      await loadPopular()
+      return
     }
     setLoading(false)
+  }
+
+  const handleDietChange = (value) => {
+    setDiet(value)
   }
 
   const handleCardClick = (id) => {
@@ -73,74 +89,62 @@ function Home() {
   }
 
   const filteredRecipes = recipes.filter((recipe) => {
-    if (dietMode === "vegetarian") return recipe.vegetarian === true
-    if (dietMode === "chicken") {
+    if (diet === "vegetarian") return recipe.vegetarian === true
+    if (diet === "chicken") {
       const title = recipe.title?.toLowerCase() || ""
       return title.includes("chicken") || title.includes("egg")
     }
     return true
   })
 
-  const buttonStyle = (active, color = "#333") => ({
-    padding: "8px 20px",
-    marginRight: "10px",
-    marginBottom: "10px",
-    background: active ? color : "#eee",
-    color: active ? "#fff" : "#333",
-    border: "none",
-    borderRadius: "20px",
-    cursor: "pointer",
-    fontSize: "14px",
-  })
+  const getSectionTitle = () => {
+    if (mode === "ingredients") return "🍳 Recipes with your ingredients"
+    if (mode === "search") return "🔍 Search results"
+    return cuisine === "indian" ? "🇮🇳 Popular Indian Recipes" : "⭐ Popular Recipes"
+  }
 
   return (
-    <div style={{ padding: "40px", fontFamily: "Arial" }}>
-      <h1 style={{ marginBottom: "30px" }}>🍳 Recipe Finder</h1>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#0f0f0f" }}>
 
-      <SearchBar onSearch={handleSearch} />
+      <IngredientFilter
+        onFilter={handleIngredients}
+        onDietChange={handleDietChange}
+        onCuisineChange={handleCuisineChange}
+      />
 
-      <hr style={{ margin: "30px 0" }} />
+      <div style={{ marginLeft: "280px", flex: 1, padding: "32px" }}>
+        <SearchBar onSearch={handleSearch} />
 
-      <IngredientFilter onFilter={handleFilter} />
+        <h2 style={{ marginBottom: "20px", fontSize: "18px", color: "#aaa" }}>
+          {getSectionTitle()}
+        </h2>
 
-      <hr style={{ margin: "30px 0" }} />
+        {loading && (
+          <div style={{ color: "#ff9800", fontSize: "16px" }}>
+            Loading recipes...
+          </div>
+        )}
 
-      {/* Cuisine Filter */}
-      <div style={{ marginBottom: "20px" }}>
-        <h3>🌍 Cuisine</h3>
-        <button style={buttonStyle(cuisine === "all")} onClick={() => handleCuisine("all")}>
-          🌐 All
-        </button>
-        <button style={buttonStyle(cuisine === "indian", "#ff6b00")} onClick={() => handleCuisine("indian")}>
-          🇮🇳 Indian
-        </button>
-      </div>
+        {error && (
+          <p style={{ color: "#f44336", fontSize: "15px" }}>{error}</p>
+        )}
 
-      {/* Diet Filter */}
-      <div style={{ marginBottom: "20px" }}>
-        <h3>🥗 Diet</h3>
-        <button style={buttonStyle(dietMode === "all")} onClick={() => setDietMode("all")}>
-          🍽️ All Allowed
-        </button>
-        <button style={buttonStyle(dietMode === "vegetarian", "#4caf50")} onClick={() => setDietMode("vegetarian")}>
-          🥦 Vegetarian Only
-        </button>
-        <button style={buttonStyle(dietMode === "chicken", "#ff9800")} onClick={() => setDietMode("chicken")}>
-          🍗 Chicken / Eggs
-        </button>
-      </div>
+        {!loading && filteredRecipes.length === 0 && !error && (
+          <p style={{ color: "#555", fontSize: "15px" }}>
+            Add ingredients on the left to find recipes 🥕
+          </p>
+        )}
 
-      {loading && <p>Loading recipes...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}>
-        {filteredRecipes.map((recipe) => (
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            onClick={handleCardClick}
-          />
-        ))}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
+          {filteredRecipes.map((recipe) => (
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              onClick={handleCardClick}
+              userIngredients={userIngredients}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

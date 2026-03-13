@@ -6,22 +6,38 @@ function SearchBar({ onSearch }) {
   }
 
   return (
-    <div style={{ marginBottom: "20px" }}>
-      <form onSubmit={handleSubmit}>
-        <input
-          name="search"
-          type="text"
-          placeholder="Search for a recipe... (e.g. pasta)"
-          style={{ padding: "10px", width: "300px", fontSize: "16px" }}
-        />
-        <button
-          type="submit"
-          style={{ padding: "10px 20px", marginLeft: "10px", fontSize: "16px" }}
-        >
-          Search
-        </button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+      <input
+        name="search"
+        type="text"
+        placeholder="Search recipes by name... (e.g. biryani)"
+        style={{
+          flex: 1,
+          padding: "12px 16px",
+          borderRadius: "10px",
+          border: "1px solid #333",
+          background: "#2a2a2a",
+          color: "#f0f0f0",
+          fontSize: "15px",
+          outline: "none"
+        }}
+      />
+      <button
+        type="submit"
+        style={{
+          padding: "12px 24px",
+          background: "#ff9800",
+          border: "none",
+          borderRadius: "10px",
+          color: "#000",
+          fontWeight: "bold",
+          cursor: "pointer",
+          fontSize: "15px"
+        }}
+      >
+        Search
+      </button>
+    </form>
   )
 }
 
