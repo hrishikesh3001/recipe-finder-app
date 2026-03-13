@@ -130,7 +130,7 @@ function Home() {
     if (mode === "ingredients") return "🍳 Recipes matching your ingredients"
     if (mode === "search") return "🔍 Search results"
     if (cuisine === "seafood") return "🦐 Seafood Recipes"
-    return "🇮🇳 Popular Indian Recipes"
+    return "🍽️ Popular Recipes"
   }
 
   const filteredRecipes = recipes.filter((recipe) => {
