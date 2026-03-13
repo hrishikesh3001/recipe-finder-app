@@ -1,16 +1,19 @@
 function SearchBar({ onSearch }) {
   const handleSubmit = (e) => {
     e.preventDefault()
-    const query = e.target.elements.search.value
-    if (query.trim()) onSearch(query)
+    const query = e.target.elements.search.value.trim()
+    if (query) onSearch(query)
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+    <form
+      onSubmit={handleSubmit}
+      style={{ display: "flex", gap: "8px", marginBottom: "24px" }}
+    >
       <input
         name="search"
         type="text"
-        placeholder="Search recipes by name... (e.g. biryani)"
+        placeholder="Search Indian recipes... (e.g. biryani, dal, paneer)"
         style={{
           flex: 1,
           padding: "12px 16px",
